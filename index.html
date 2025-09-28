@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>eloog — search</title>
+  <style>
+    body {
+      background-color: #000;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      text-align: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 960px;
+      padding: 20px;
+    }
+
+    .logo {
+      font-size: 3em;
+      font-weight: bold;
+      margin-bottom: 20px;
+    }
+    .logo .o {
+      color: #00aaff;
+    }
+
+    .search-card {
+      background-color: #111;
+      padding: 20px;
+      border-radius: 12px;
+    }
+
+    .search-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    .search-input {
+      flex: 1;
+      border: 1px solid #333;
+      background-color: #000;
+      padding: 12px 14px;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 16px;
+      outline: none;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 12px 20px;
+      background-color: #333;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 8px;
+      transition: background-color 0.3s ease;
+      font-size: 1em;
+      border: none;
+      cursor: pointer;
+    }
+
+    .btn:hover {
+      background-color: #555;
+    }
+
+    .controls {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .hint {
+      color: #999;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+
+    .suggestions {
+      margin-top: 12px;
+      text-align: left;
+    }
+    .suggestion {
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .suggestion:hover {
+      background-color: #222;
+    }
+
+    .results {
+      max-width: 880px;
+      margin: 28px auto;
+      text-align: left;
+    }
+    .result {
+      background: #111;
+      padding: 14px;
+      border-radius: 10px;
+      margin-bottom: 12px;
+    }
+    .result .title {
+      font-weight: bold;
+      color: #fff;
+    }
+    .result .url {
+      color: #999;
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    .footer {
+      margin-top: 28px;
+      color: #999;
+      font-size: 14px;
+      text-align: center;
+    }
+
+    @media (max-width:600px) {
+      .logo {font-size: 2em;}
+      .search-row {flex-direction: column;}
+      .btn {width: 100%;}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">el<span class="o">oo</span>g</div>
+
+    <div class="search-card" id="home">
+      <div style="font-size:16px;margin-bottom:8px;color:#999">Search everything — pretend it's a very friendly engine</div>
+      <div class="search-row">
+        <input id="query" class="search-input" placeholder="Search eloog or the web" aria-label="Search" autocomplete="off">
+        <button class="btn" id="searchBtn">Search</button>
+        <button class="btn" id="webBtn">Search Web</button>
+      </div>
+      <div class="controls">
+        <button class="btn" id="luckyBtn">I'm Feeling Lucky</button>
+        <button class="btn" id="clearBtn">Clear</button>
+      </div>
+      <div class="hint">Tip: click a suggestion or press Enter. "Search Web" sends your query to DuckDuckGo.</div>
+
+      <div class="suggestions" id="suggestions" aria-live="polite"></div>
+    </div>
+
+    <div id="resultsScreen" style="display:none">
+      <div class="results" id="resultsList"></div>
+      <div class="footer">Powered by your imagination · <a href="#" id="back" style="color:inherit;text-decoration:underline">Back</a></div>
+    </div>
+  </div>
+
+  <script>
+    const sampleIndex = [
+      {title:'Eloquent JavaScript — A Modern Introduction to Programming', url:'https://eloquentjavascript.net', snippet:'A book providing a thorough introduction to JavaScript and programming.'},
+      {title:'MDN Web Docs', url:'https://developer.mozilla.org', snippet:'Resources for developers, including documentation on HTML, CSS, and JavaScript.'},
+      {title:'Stack Overflow', url:'https://stackoverflow.com', snippet:'Q&A for professional and enthusiast programmers.'},
+      {title:'Wikipedia', url:'https://wikipedia.org', snippet:'Free encyclopedia with articles on nearly every topic.'},
+      {title:'BBC News', url:'https://bbc.com', snippet:'Latest world news and analysis.'},
+      {title:'National Geographic', url:'https://nationalgeographic.com', snippet:'Science, exploration and adventure content.'},
+      {title:'GitHub', url:'https://github.com', snippet:'Host and review code, manage projects, and build software.'},
+      {title:'Hacker News', url:'https://news.ycombinator.com', snippet:'A social news website focusing on computer science and entrepreneurship.'}
+    ];
+
+    const suggestionsBox = document.getElementById('suggestions');
+    const queryInput = document.getElementById('query');
+    const resultsScreen = document.getElementById('resultsScreen');
+    const resultsList = document.getElementById('resultsList');
+    const homeCard = document.getElementById('home');
+
+    function makeSuggestions(q){
+      const ql = q.trim().toLowerCase();
+      suggestionsBox.innerHTML='';
+      if(!ql) return;
+      const matches = sampleIndex.filter(item=> item.title.toLowerCase().includes(ql) || item.snippet.toLowerCase().includes(ql)).slice(0,5);
+      matches.forEach(m=>{
+        const div = document.createElement('div');
+        div.className='suggestion';
+        div.innerHTML = `<strong>${escapeHtml(m.title)}</strong><div style="font-size:13px;color:#999">${escapeHtml(m.url)}</div>`;
+        div.onclick = ()=>{ queryInput.value = m.title; doSearch(); };
+        suggestionsBox.appendChild(div);
+      });
+    }
+
+    function doSearch(){
+      const q = queryInput.value.trim();
+      if(!q) return;
+      const ql = q.toLowerCase();
+      const scored = sampleIndex.map(item=>{
+        let score = 0;
+        const text = (item.title + ' ' + item.snippet).toLowerCase();
+        if(text.includes(ql)) score += 10;
+        if(item.url.includes(ql)) score += 5;
+        score += Math.random();
+        return {...item,score};
+      }).sort((a,b)=>b.score-a.score);
+
+      resultsList.innerHTML = '';
+      scored.forEach(item=>{
+        const el = document.createElement('div'); el.className='result';
+        el.innerHTML = `<div class="url">${escapeHtml(item.url)}</div><div class="title">${escapeHtml(item.title)}</div><div style="margin-top:6px;color:#999">${escapeHtml(item.snippet)}</div>`;
+        el.onclick = ()=>{ window.open(item.url,'_blank'); };
+        resultsList.appendChild(el);
+      });
+
+      homeCard.style.display='none';
+      resultsScreen.style.display='block';
+    }
+
+    function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+    queryInput.addEventListener('input', (e)=>{ makeSuggestions(e.target.value); });
+    queryInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ doSearch(); } });
+    document.getElementById('searchBtn').addEventListener('click', doSearch);
+    document.getElementById('clearBtn').addEventListener('click', ()=>{ queryInput.value=''; suggestionsBox.innerHTML=''; queryInput.focus(); });
+    document.getElementById('back').addEventListener('click',(e)=>{ e.preventDefault(); resultsScreen.style.display='none'; homeCard.style.display='block'; resultsList.innerHTML=''; });
+    document.getElementById('luckyBtn').addEventListener('click', ()=>{
+      const r = sampleIndex[Math.floor(Math.random()*sampleIndex.length)];
+      window.open(r.url,'_blank');
+    });
+    document.getElementById('webBtn').addEventListener('click', ()=>{
+      const q = encodeURIComponent(queryInput.value.trim());
+      if(!q) return; window.location.href = 'https://duckduckgo.com/?q='+q;
+    });
+
+    window.addEventListener('load', ()=>{ setTimeout(()=>queryInput.focus(),150); });
+  </script>
+</body>
+</html>
